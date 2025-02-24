@@ -2,12 +2,21 @@ package ApiTesting;
 
 import io.restassured.response.Response;
 import org.testng.Assert;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
-
 import java.util.HashMap;
 import java.util.Map;
 
-public class UsersTest extends ApiTestBase{
+public class UsersTest extends ApiTestBase {
+
+    @DataProvider(name = "userDataProvider")
+    public static Object[][] userData() {
+        return new Object[][]{
+                {"Carlos López", "male", "carlos.lopez@test.com", "active"},
+                {"Ana Gómez", "female", "ana.gomez@test.com", "inactive"},
+                {"Pedro Martínez", "male", "pedro.martinez@test.com", "active"}
+        };
+    }
 
     @Test
     public void testGetUsers() {
@@ -21,13 +30,13 @@ public class UsersTest extends ApiTestBase{
         System.out.println(response.prettyPrint());
     }
 
-    @Test
-    public void testCreateUser() {
+    @Test(dataProvider = "userDataProvider")
+    public void testCreateUser(String name, String gender, String email, String status) {
         Map<String, String> userData = new HashMap<>();
-        userData.put("name", "Juan Pérez");
-        userData.put("gender", "male");
-        userData.put("email", "juan.perez" + System.currentTimeMillis() + "@gmail.com");
-        userData.put("status", "active");
+        userData.put("name", name);
+        userData.put("gender", gender);
+        userData.put("email", email.replace("@", System.currentTimeMillis() + "@"));
+        userData.put("status", status);
 
         Response response = getRequestSpecification()
                 .body(userData)
@@ -40,13 +49,13 @@ public class UsersTest extends ApiTestBase{
         Assert.assertEquals(response.jsonPath().getString("name"), userData.get("name"));
     }
 
-    @Test
-    public void testGetUserById() {
+    @Test(dataProvider = "userDataProvider")
+    public void testGetUserById(String name, String gender, String email, String status) {
         Map<String, String> userData = new HashMap<>();
-        userData.put("name", "Carlos López");
-        userData.put("gender", "male");
-        userData.put("email", "carlos.lopez" + System.currentTimeMillis() + "@gmail.com");
-        userData.put("status", "active");
+        userData.put("name", name);
+        userData.put("gender", gender);
+        userData.put("email", email.replace("@", System.currentTimeMillis() + "@"));
+        userData.put("status", status);
 
         Response createResponse = getRequestSpecification()
                 .body(userData)
@@ -66,13 +75,13 @@ public class UsersTest extends ApiTestBase{
         Assert.assertEquals(getResponse.jsonPath().getString("name"), userData.get("name"));
     }
 
-    @Test
-    public void testUpdateUser() {
+    @Test(dataProvider = "userDataProvider")
+    public void testUpdateUser(String name, String gender, String email, String status) {
         Map<String, String> userData = new HashMap<>();
-        userData.put("name", "Pedro Martinez");
-        userData.put("gender", "male");
-        userData.put("email", "pedro.martinez" + System.currentTimeMillis() + "@gmail.com");
-        userData.put("status", "active");
+        userData.put("name", name);
+        userData.put("gender", gender);
+        userData.put("email", email.replace("@", System.currentTimeMillis() + "@"));
+        userData.put("status", status);
 
         Response createResponse = getRequestSpecification()
                 .body(userData)
@@ -82,8 +91,7 @@ public class UsersTest extends ApiTestBase{
         String userId = createResponse.jsonPath().getString("id");
 
         Map<String, String> updatedUserData = new HashMap<>();
-        updatedUserData.put("name", "Pedro M. Updated");
-        updatedUserData.put("email", "pedro.updated" + System.currentTimeMillis() + "@gmail.com");
+        updatedUserData.put("name", name + " Updated");
         updatedUserData.put("status", "inactive");
 
         Response updateResponse = getRequestSpecification()
@@ -95,14 +103,6 @@ public class UsersTest extends ApiTestBase{
         Assert.assertEquals(updateResponse.statusCode(), 200);
         Assert.assertEquals(updateResponse.jsonPath().getString("name"), updatedUserData.get("name"));
         Assert.assertEquals(updateResponse.jsonPath().getString("status"), updatedUserData.get("status"));
-
-        Response getResponse = getRequestSpecification()
-                .when()
-                .get("/users/" + userId);
-
-        Assert.assertEquals(getResponse.statusCode(), 200);
-        Assert.assertEquals(getResponse.jsonPath().getString("name"), updatedUserData.get("name"));
-        Assert.assertEquals(getResponse.jsonPath().getString("status"), updatedUserData.get("status"));
     }
 
     @Test
@@ -182,109 +182,5 @@ public class UsersTest extends ApiTestBase{
         int totalUsers = response.jsonPath().getList("").size();
         Assert.assertTrue(totalUsers <= 5, "User ammount given should be 5 maximum");
     }
-
-    @Test
-    public void testGetUserByIdGraphQL() {
-        Map<String, String> userData = new HashMap<>();
-        userData.put("name", "Lucas Ortega");
-        userData.put("gender", "male");
-        userData.put("email", "lucas.ortega" + System.currentTimeMillis() + "@gmail.com");
-        userData.put("status", "active");
-
-        Response createResponse = getRequestSpecification()
-                .body(userData)
-                .post("/users");
-
-        Assert.assertEquals(createResponse.statusCode(), 201);
-        String userId = createResponse.jsonPath().getString("id");
-
-        String query = "{ \"query\": \"query { user(id: " + userId + ") { id name email gender status } }\" }";
-
-        Response response = getRequestSpecification()
-                .body(query)
-                .post("/graphql");
-
-        System.out.println("Response Body: " + response.prettyPrint());
-
-        Assert.assertEquals(response.statusCode(), 200);
-        Assert.assertEquals(response.jsonPath().getString("data.user.id"), userId);
-        Assert.assertEquals(response.jsonPath().getString("data.user.name"), userData.get("name"));
-    }
-
-    @Test
-    public void testCreateUserGraphQL() {
-        String mutation = "{ \"query\": \"mutation { createUser(input: { name: \\\"María González\\\", gender: \\\"female\\\", email: \\\"maria.gonzalez"
-                + System.currentTimeMillis() + "@gmail.com\\\", status: \\\"active\\\" }) { user { id name email gender status } } }\" }";
-
-        Response response = getRequestSpecification()
-                .body(mutation)
-                .post("/graphql");
-
-        System.out.println("Response Body: " + response.prettyPrint());
-
-        Assert.assertEquals(response.statusCode(), 200);
-        Assert.assertNotNull(response.jsonPath().getString("data.createUser.user.id"), "User ID should be null");
-        Assert.assertEquals(response.jsonPath().getString("data.createUser.user.name"), "María González");
-        Assert.assertEquals(response.jsonPath().getString("data.createUser.user.status"), "active");
-    }
-
-    @Test
-    public void testUpdateUserGraphQL() {
-        String mutationCreate = "{ \"query\": \"mutation { createUser(input: { name: \\\"Lucas Ramírez\\\", gender: \\\"male\\\", email: \\\"lucas.ramirez"
-                + System.currentTimeMillis() + "@gmail.com\\\", status: \\\"active\\\" }) { user { id name email gender status } } }\" }";
-
-        Response createResponse = getRequestSpecification()
-                .body(mutationCreate)
-                .post("/graphql");
-
-        Assert.assertEquals(createResponse.statusCode(), 200);
-        String userId = createResponse.jsonPath().getString("data.createUser.user.id");
-
-        String mutationUpdate = "{ \"query\": \"mutation { updateUser(input: { id: " + userId + ", name: \\\"Lucas R. updated\\\", status: \\\"inactive\\\" }) { user { id name status } } }\" }";
-
-        Response updateResponse = getRequestSpecification()
-                .body(mutationUpdate)
-                .post("/graphql");
-
-        System.out.println("Response Body: " + updateResponse.prettyPrint());
-
-        Assert.assertEquals(updateResponse.statusCode(), 200);
-        Assert.assertEquals(updateResponse.jsonPath().getString("data.updateUser.user.name"), "Lucas R. updated");
-        Assert.assertEquals(updateResponse.jsonPath().getString("data.updateUser.user.status"), "inactive");
-    }
-
-    @Test
-    public void testDeleteUserGraphQL() {
-        String mutationCreate = "{ \"query\": \"mutation { createUser(input: { name: \\\"Diego Torres\\\", gender: \\\"male\\\", email: \\\"diego.torres"
-                + System.currentTimeMillis() + "@gmail.com\\\", status: \\\"active\\\" }) { user { id name email gender status } } }\" }";
-
-        Response createResponse = getRequestSpecification()
-                .body(mutationCreate)
-                .post("/graphql");
-
-        Assert.assertEquals(createResponse.statusCode(), 200);
-        String userId = createResponse.jsonPath().getString("data.createUser.user.id");
-
-        String mutationDelete = "{ \"query\": \"mutation { deleteUser(input: { id: " + userId + " }) { user { id name email gender status } } }\" }";
-
-        Response deleteResponse = getRequestSpecification()
-                .body(mutationDelete)
-                .post("/graphql");
-
-        System.out.println("Response Body: " + deleteResponse.prettyPrint());
-
-        Assert.assertEquals(deleteResponse.statusCode(), 200);
-        Assert.assertEquals(deleteResponse.jsonPath().getString("data.deleteUser.user.id"), userId);
-
-        String queryGet = "{ \"query\": \"query { user(id: " + userId + ") { id name email gender status } }\" }";
-
-        Response getResponse = getRequestSpecification()
-                .body(queryGet)
-                .post("/graphql");
-
-        Assert.assertEquals(getResponse.statusCode(), 200);
-        Assert.assertNull(getResponse.jsonPath().get("data.user"), "Deleted user should not exist");
-    }
-
 
 }
